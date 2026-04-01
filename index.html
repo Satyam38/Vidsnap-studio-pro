@@ -1,0 +1,1399 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Video→Photo — Capture, Filters, Crop Ratios, Upscale</title>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --bg: #0b1014;
+        --panel: #111418;
+        --muted: #98a3ad;
+        --glass: rgba(255, 255, 255, 0.04);
+        --accent: #08a4ff;
+        color-scheme: dark;
+      }
+      * {
+        box-sizing: border-box;
+        font-family: Inter, system-ui, Arial, sans-serif;
+      }
+      html,
+      body {
+        height: 100%;
+        margin: 0;
+        background: linear-gradient(180deg, #061018, #0b1014);
+        color: #e8eef6;
+      }
+
+      .app {
+        max-width: 1600px;
+        margin: 18px auto;
+        padding: 14px;
+        display: grid;
+        grid-template-columns: 1fr 1fr 360px;
+        gap: 16px;
+      }
+
+      .gallery {
+        background: linear-gradient(
+          180deg,
+          rgba(255, 255, 255, 0.02),
+          rgba(255, 255, 255, 0.01)
+        );
+        border-radius: 12px;
+        padding: 12px;
+        border: 1px solid var(--glass);
+        height: calc(100vh - 80px);
+        display: flex;
+        flex-direction: column;
+      }
+      #thumbList {
+        flex: 1;
+        overflow-y: auto;
+        margin-top: 10px;
+        padding-right: 5px;
+      }
+
+      .gallery h3 {
+        margin: 0 0 8px 0;
+      }
+      .thumb {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        padding: 8px;
+        background: #0f1417;
+        border-radius: 10px;
+        margin-bottom: 10px;
+        box-shadow: 0 6px 18px rgba(0, 0, 0, 0.4);
+      }
+      .thumb img {
+        width: 120px;
+        height: 72px;
+        object-fit: cover;
+        border-radius: 8px;
+      }
+      .thumb .meta {
+        flex: 1;
+        color: var(--muted);
+        font-size: 13px;
+      }
+      .thumb .meta b {
+        display: block;
+        color: #fff;
+        margin-bottom: 6px;
+      }
+      .thumb .actions {
+        display: flex;
+        gap: 6px;
+        flex-direction: column;
+      }
+      .btn {
+        background: rgba(255, 255, 255, 0.04);
+        border: 1px solid var(--glass);
+        padding: 8px 10px;
+        border-radius: 8px;
+        color: #e6eef6;
+        cursor: pointer;
+        transition: all 0.2s ease;
+      }
+      .btn:hover {
+        background: rgba(255, 255, 255, 0.08);
+        transform: translateY(-1px);
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+      }
+      .btn:active {
+        transform: translateY(0);
+        box-shadow: none;
+      }
+      .btn:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+        background: rgba(255, 255, 255, 0.02);
+        transform: none;
+        box-shadow: none;
+      }
+
+      .controls-row {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+        margin-top: 10px;
+        align-items: center;
+      }
+
+      .playerCard {
+        background: linear-gradient(
+          180deg,
+          rgba(255, 255, 255, 0.02),
+          rgba(255, 255, 255, 0.01)
+        );
+        border-radius: 12px;
+        padding: 12px;
+        border: 1px solid var(--glass);
+        display: flex;
+        flex-direction: column;
+        align-items: stretch;
+        height: calc(100vh - 80px);
+      }
+      .playerWrap {
+        background: #000;
+        border-radius: 10px;
+        overflow: hidden;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        height: 58%;
+      }
+      video {
+        width: 100%;
+        height: 100%;
+        background: #000;
+        display: block;
+        object-fit: contain;
+        filter: var(--video-filter, none);
+      }
+      .small-info {
+        display: flex;
+        justify-content: space-between;
+        color: var(--muted);
+        font-size: 13px;
+        margin-top: 8px;
+      }
+      .zoomPreview {
+        width: 120px;
+        height: 90px;
+        border-radius: 8px;
+        background: #000;
+        margin-top: 8px;
+        overflow: hidden;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+      }
+
+      .options {
+        background: linear-gradient(
+          180deg,
+          rgba(255, 255, 255, 0.02),
+          rgba(255, 255, 255, 0.01)
+        );
+        border-radius: 12px;
+        padding: 14px;
+        border: 1px solid var(--glass);
+        height: calc(100vh - 80px);
+        overflow: auto;
+      }
+      label {
+        display: block;
+        color: var(--muted);
+        font-size: 13px;
+        margin-top: 8px;
+      }
+
+      select {
+        width: 100%;
+        padding: 8px;
+        border-radius: 8px;
+        border: 1px solid var(--glass);
+        background-color: var(--panel);
+        color: #e8eef6;
+        -webkit-appearance: none;
+        -moz-appearance: none;
+        appearance: none;
+        background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2398a3ad' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
+        background-repeat: no-repeat;
+        background-position: right 8px center;
+        background-size: 1em;
+        transition: border-color 0.2s ease;
+      }
+      select:focus {
+        border-color: var(--accent);
+        outline: none;
+      }
+      option {
+        color: #000; 
+        background: #fff; 
+      }
+      select:focus option {
+        color: #000;
+        background: #fff;
+      }
+
+      input[type="number"],
+      input[type="text"] {
+        width: 100%;
+        padding: 8px;
+        border-radius: 8px;
+        border: 1px solid var(--glass);
+        background: transparent;
+        color: #fff;
+        transition: border-color 0.2s ease;
+      }
+      input[type="number"]:focus,
+      input[type="text"]:focus {
+        border-color: var(--accent);
+        outline: none;
+      }
+
+      input[type="file"] {
+        display: none; 
+      }
+      .file-btn {
+        background: rgba(255, 255, 255, 0.04);
+        border: 1px solid var(--glass);
+        padding: 8px 10px;
+        border-radius: 8px;
+        color: #e6eef6;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        display: inline-block;
+        text-align: center;
+      }
+      .file-btn:hover {
+        background: rgba(255, 255, 255, 0.08);
+        transform: translateY(-1px);
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+      }
+      .file-info {
+        font-size: 12px;
+        color: var(--muted);
+        margin-left: 8px;
+      }
+
+      .row {
+        display: flex;
+        gap: 8px;
+      }
+      .muted {
+        color: var(--muted);
+        font-size: 13px;
+      }
+      /* sliders */
+      .slider {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-top: 6px;
+      }
+      .slider input[type="range"] {
+        flex: 1;
+        appearance: none;
+        -webkit-appearance: none;
+        height: 4px;
+        background: var(--glass);
+        border-radius: 2px;
+        outline: none;
+        transition: background 0.2s ease;
+      }
+      .slider input[type="range"]:hover {
+        background: rgba(255, 255, 255, 0.1);
+      }
+      .slider input[type="range"]::-webkit-slider-thumb {
+        appearance: none;
+        -webkit-appearance: none;
+        width: 16px;
+        height: 16px;
+        border-radius: 50%;
+        background: var(--accent);
+        cursor: pointer;
+        box-shadow: 0 0 0 3px rgba(8, 164, 255, 0.3);
+        transition: background 0.2s ease;
+      }
+      .slider input[type="range"]::-moz-range-thumb {
+        width: 16px;
+        height: 16px;
+        border-radius: 50%;
+        background: var(--accent);
+        cursor: pointer;
+        box-shadow: 0 0 0 3px rgba(8, 164, 255, 0.3);
+        transition: background 0.2s ease;
+      }
+      .slider input[type="range"]::-webkit-slider-thumb:hover,
+      .slider input[type="range"]::-moz-range-thumb:hover {
+        background: #068de0;
+      }
+
+      @media (max-width: 1200px) {
+        .app {
+          grid-template-columns: 1fr;
+          grid-auto-rows: auto;
+        }
+        .gallery {
+          height: auto;
+        }
+        .playerCard {
+          height: auto;
+        }
+        .options {
+          height: auto;
+        }
+      }
+
+      .big-footer {
+        margin-top: 10px;
+        color: var(--muted);
+        font-size: 13px;
+      }
+
+      @keyframes fadeIn {
+        from {
+          opacity: 0;
+          transform: translateY(10px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+      .thumb {
+        animation: fadeIn 0.4s ease-out;
+        transition:
+          transform 0.2s ease,
+          box-shadow 0.2s ease;
+      }
+      .thumb:hover {
+        transform: scale(1.02);
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="app">
+      <aside class="gallery" id="gallery">
+        <h3>Gallery</h3>
+
+        <div class="gallery-controls">
+          <div class="controls-row" style="margin-top: 0">
+            <button class="btn" id="downloadAllBtn">Download All</button>
+            <button class="btn" id="clearAllBtn">Clear All</button>
+            <button class="btn" id="zipBtn">Create ZIP</button>
+          </div>
+
+          <div
+            class="controls-row"
+            style="
+              margin-top: 10px;
+              border-top: 1px solid var(--glass);
+              padding-top: 10px;
+            "
+          >
+            <label for="upscaleFactorEl" class="muted" style="margin: 0"
+              >Upscale Factor:</label
+            >
+            <select id="upscaleFactorEl" style="width: 70px">
+              <option value="2">2×</option>
+              <option value="4">4×</option>
+            </select>
+            <span class="muted" style="font-size: 12px; flex: 1"
+              >(Use <b>Upscale</b> button on items below)</span
+            >
+          </div>
+        </div>
+
+        <div id="thumbList"></div>
+
+        <div class="big-footer" id="galleryCount">0 captures</div>
+      </aside>
+
+      <main class="playerCard">
+        <div class="playerWrap" id="playerWrap">
+          <video
+            id="video"
+            controls
+            crossorigin="anonymous"
+            playsinline
+          ></video>
+          <canvas id="internalCanvas" style="display: none"></canvas>
+        </div>
+
+        <div
+          style="
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            margin-top: 10px;
+            flex-wrap: wrap;
+          "
+        >
+          <label for="file" class="btn">Choose Video</label>
+          <input id="file" type="file" accept="video/*" />
+          <span id="videoFileName" class="file-info">No video chosen</span>
+
+          <button id="captureBtn" class="btn">Capture</button>
+          <button id="burstBtn" class="btn">Burst ×10</button>
+          <div style="margin-left: auto" class="muted">
+            FPS: <span id="detFps">-</span>
+          </div>
+        </div>
+
+        <div
+          class="controls-row"
+          style="
+            margin-top: 10px;
+            border-top: 1px solid var(--glass);
+            padding-top: 10px;
+          "
+        >
+          <label for="autoInterval" class="muted" style="margin: 0"
+            >Interval (sec):</label
+          >
+          <input
+            id="autoInterval"
+            type="number"
+            value="2"
+            min="0.2"
+            step="0.1"
+            style="width: 70px; padding: 8px"
+          />
+          <button id="startAuto" class="btn">Start Auto</button>
+          <button id="stopAuto" class="btn" disabled>Stop Auto</button>
+        </div>
+        <div class="small-info">
+          <div class="muted">
+            Instructions: choose ratio/filter/options on right → press Capture.
+            Uses centered crop if ratio set (draw-free).
+          </div>
+          <div
+            style="display: flex; flex-direction: column; align-items: flex-end"
+          >
+            <div class="muted">Zoom Preview</div>
+            <div class="zoomPreview" id="zoomPreview"></div>
+          </div>
+        </div>
+
+        <div
+          style="margin-top: 8px; color: var(--muted); font-size: 13px"
+          id="status"
+        >
+          Status: ready
+        </div>
+      </main>
+
+      <aside class="options">
+        <h4 style="margin: 0 0 8px 0">Output & Settings</h4>
+
+        <label>Format</label>
+        <select id="format">
+          <option value="image/png">PNG</option>
+          <option value="image/jpeg">JPEG</option>
+          <option value="image/webp">WEBP</option>
+        </select>
+
+        <label>Quality (0.0 - 1.0) or MB target</label>
+        <div class="row">
+          <input
+            id="quality"
+            type="number"
+            min="0.01"
+            max="1"
+            step="0.01"
+            value="0.92"
+          />
+          <input
+            id="mbTarget"
+            type="number"
+            min="0"
+            step="0.1"
+            placeholder="MB target (opt)"
+            style="width: 110px"
+          />
+        </div>
+        <div class="muted" style="font-size: 12px">
+          Leave MB empty to use quality directly. MB target uses best-effort
+          binary search (approx).
+        </div>
+
+        <label>Resolution / Resize (optional)</label>
+        <div class="row">
+          <input id="resizeW" type="number" placeholder="width (px)" />
+          <input id="resizeH" type="number" placeholder="height (px)" />
+        </div>
+        <div class="muted" style="font-size: 12px">
+          Leave empty to keep native/crop size.
+        </div>
+
+        <label>Crop Ratio (centered)</label>
+        <select id="ratio">
+          <option value="free">Free (full frame)</option>
+          <option value="1:1">1 : 1 (Instagram Square)</option>
+          <option value="4:5">4 : 5 (Instagram Portrait)</option>
+          <option value="9:16">9 : 16 (Story / Reel / YouTube Shorts)</option>
+          <option value="16:9">
+            16 : 9 (Video / Landscape / YouTube Video)
+          </option>
+          <option value="1.91:1">1.91 : 1 (Facebook/X Landscape Post)</option>
+          <option value="3:2">3 : 2 (Photography)</option>
+        </select>
+
+        <label style="margin-top: 10px">Filters / LUT pickup</label>
+        <select id="filterPreset">
+          <option value="none">None</option>
+          <option value="warm">Warm</option>
+          <option value="cold">Cold</option>
+          <option value="bw">B/W</option>
+          <option value="retro">Retro</option>
+          <option value="vibrant">Vibrant</option>
+          <option value="cinematic">Cinematic</option>
+          <option value="dreamy">Dreamy</option>
+        </select>
+
+        <label>Color Adjust (brightness, contrast, saturate)</label>
+        <div class="slider">
+          <span class="muted" style="width: 60px">B</span>
+          <input
+            id="brightness"
+            type="range"
+            min="0.3"
+            max="2"
+            step="0.01"
+            value="1"
+          />
+          <span id="bVal" class="muted" style="width: 40px; text-align: right"
+            >1.00</span
+          >
+        </div>
+        <div class="slider">
+          <span class="muted" style="width: 60px">C</span>
+          <input
+            id="contrast"
+            type="range"
+            min="0.3"
+            max="2"
+            step="0.01"
+            value="1"
+          />
+          <span id="cVal" class="muted" style="width: 40px; text-align: right"
+            >1.00</span
+          >
+        </div>
+        <div class="slider">
+          <span class="muted" style="width: 60px">S</span>
+          <input
+            id="saturate"
+            type="range"
+            min="0"
+            max="3"
+            step="0.01"
+            value="1"
+          />
+          <span id="sVal" class="muted" style="width: 40px; text-align: right"
+            >1.00</span
+          >
+        </div>
+
+        <label>Watermark (text)</label>
+        <input id="wmText" type="text" placeholder="Watermark text" />
+
+        <label>Watermark (image)</label>
+        <div style="display: flex; align-items: center; margin-top: 4px">
+          <label for="wmImageFile" class="file-btn">Choose Image</label>
+          <input id="wmImageFile" type="file" accept="image/*" />
+          <span id="wmFileName" class="file-info">No file chosen</span>
+        </div>
+
+        <label>Watermark Position</label>
+        <select id="wmPosition">
+          <option value="bottom-right">Bottom-Right</option>
+          <option value="bottom-left">Bottom-Left</option>
+          <option value="top-right">Top-Right</option>
+          <option value="top-left">Top-Left</option>
+          <option value="center">Center</option>
+        </select>
+        <div
+          style="
+            margin-top: 12px;
+            border-top: 1px dashed var(--glass);
+            padding-top: 10px;
+          "
+        >
+          <h4 style="margin: 0 0 8px 0">Upscale All Originals</h4>
+          <p class="muted" style="margin-top: 0; font-size: 12px">
+            Upscales all non-upscaled captures to selected target resolution.
+          </p>
+          <div class="controls-row">
+            <label
+              for="upscaleTargetResolution"
+              class="muted"
+              style="margin: 0; width: auto; flex-shrink: 0"
+              >Target Resolution:</label
+            >
+            <select id="upscaleTargetResolution" style="flex: 1">
+              <option value="1080p">1080p (FHD)</option>
+              <option value="2k">2K (QHD)</option>
+              <option value="4k">4K (UHD)</option>
+              <option value="8k">8K (UHD)</option>
+            </select>
+          </div>
+          <button
+            class="btn"
+            id="upscaleAllOriginalsBtn"
+            style="width: 100%; margin-top: 8px"
+          >
+            Start Upscale All
+          </button>
+        </div>
+
+        <div
+          style="
+            margin-top: 12px;
+            border-top: 1px dashed var(--glass);
+            padding-top: 10px;
+          "
+        >
+          <button id="applyFilterBtn" class="btn">
+            Apply Filter to Video (live)
+          </button>
+          <button id="clearFilterBtn" class="btn">Clear Filters</button>
+        </div>
+        <div style="margin-top: 12px">
+          <div class="muted">Clear temp URLs</div>
+          <button id="clearTempBtn" class="btn">Clear Temp URLs</button>
+        </div>
+      </aside>
+    </div>
+
+    <script>
+      const video = document.getElementById("video");
+      const fileEl = document.getElementById("file");
+      const videoFileName = document.getElementById("videoFileName");
+      const captureBtn = document.getElementById("captureBtn");
+      const thumbList = document.getElementById("thumbList");
+      const galleryCount = document.getElementById("galleryCount");
+      const downloadAllBtn = document.getElementById("downloadAllBtn");
+      const clearAllBtn = document.getElementById("clearAllBtn");
+      const zipBtn = document.getElementById("zipBtn");
+      const status = document.getElementById("status");
+      const detFpsEl = document.getElementById("detFps");
+      const zoomPreview = document.getElementById("zoomPreview");
+
+      const formatEl = document.getElementById("format");
+      const qualityEl = document.getElementById("quality");
+      const mbTargetEl = document.getElementById("mbTarget");
+      const resizeW = document.getElementById("resizeW");
+      const resizeH = document.getElementById("resizeH");
+      const ratioEl = document.getElementById("ratio");
+      const filterPreset = document.getElementById("filterPreset");
+      const brightness = document.getElementById("brightness");
+      const contrast = document.getElementById("contrast");
+      const saturate = document.getElementById("saturate");
+      const bVal = document.getElementById("bVal"),
+        cVal = document.getElementById("cVal"),
+        sVal = document.getElementById("sVal");
+      const applyFilterBtn = document.getElementById("applyFilterBtn");
+      const clearFilterBtn = document.getElementById("clearFilterBtn");
+      const wmText = document.getElementById("wmText");
+      const wmImageFile = document.getElementById("wmImageFile");
+      const wmFileName = document.getElementById("wmFileName");
+      const wmPosition = document.getElementById("wmPosition"); 
+      const internalCanvas = document.getElementById("internalCanvas");
+      const clearTempBtn = document.getElementById("clearTempBtn");
+
+      const autoIntervalEl = document.getElementById("autoInterval");
+      const startAutoBtn = document.getElementById("startAuto");
+      const stopAutoBtn = document.getElementById("stopAuto");
+
+      const upscaleFactorEl = document.getElementById("upscaleFactorEl");
+      const upscaleTargetResolution = document.getElementById(
+        "upscaleTargetResolution",
+      );
+      const upscaleAllOriginalsBtn = document.getElementById(
+        "upscaleAllOriginalsBtn",
+      );
+
+      let autoTimer = null;
+      let captures = []; 
+      let watermarkImg = null;
+      let tempUrls = [];
+      let detectedFps = "-";
+      let isUpscaling = false; 
+
+      function buildFilterString() {
+        const bp = Number(brightness.value),
+          ct = Number(contrast.value),
+          st = Number(saturate.value);
+        let preset = filterPreset.value;
+        let extra = "";
+        if (preset === "warm")
+          extra = "sepia(0.12) saturate(1.05) hue-rotate(-5deg)";
+        if (preset === "cold")
+          extra = "brightness(0.98) saturate(0.9) hue-rotate(15deg)";
+        if (preset === "bw") extra = "grayscale(1)";
+        if (preset === "retro")
+          extra = "sepia(0.18) contrast(1.05) saturate(0.9) brightness(0.98)";
+        if (preset === "vibrant") extra = "saturate(1.5) contrast(1.05)";
+        if (preset === "cinematic")
+          extra = "sepia(0.2) contrast(1.1) saturate(1.1) hue-rotate(-5deg)";
+        if (preset === "dreamy")
+          extra = "brightness(1.05) saturate(0.9) contrast(0.9) sepia(0.1)";
+
+        const s = `brightness(${bp}) contrast(${ct}) saturate(${st}) ${extra}`;
+        return s.trim();
+      }
+      function applyFilterToVideo() {
+        const s = buildFilterString();
+        video.style.filter = s;
+        video.style.setProperty("--video-filter", s);
+        updateZoomPreview();
+      }
+      function clearFilters() {
+        filterPreset.value = "none";
+        brightness.value = 1;
+        contrast.value = 1;
+        saturate.value = 1;
+        bVal.textContent = Number(brightness.value).toFixed(2);
+        cVal.textContent = Number(contrast.value).toFixed(2);
+        sVal.textContent = Number(saturate.value).toFixed(2);
+        applyFilterToVideo();
+      }
+
+      function updateZoomPreview() {
+        const canvas = document.createElement("canvas");
+        canvas.width = 160;
+        canvas.height = 120;
+        const ctx = canvas.getContext("2d");
+
+        const vw = video.videoWidth,
+          vh = video.videoHeight;
+        if (!vw || !vh) {
+          zoomPreview.innerHTML =
+            '<div style="color:var(--muted);padding:8px">No video</div>';
+          return;
+        }
+
+        const internalCtx = internalCanvas.getContext("2d");
+        internalCanvas.width = vw;
+        internalCanvas.height = vh;
+
+        try {
+          internalCtx.drawImage(video, 0, 0, vw, vh); 
+          ctx.filter = cssFilterToCanvasFilter(buildFilterString()); 
+          ctx.drawImage(internalCanvas, 0, 0, vw, vh, 0, 0, 160, 120); 
+
+          zoomPreview.innerHTML = "";
+          canvas.style.width = "120px";
+          canvas.style.height = "90px";
+          zoomPreview.appendChild(canvas);
+        } catch (e) {
+          console.warn("zoom preview draw err", e);
+          zoomPreview.innerHTML =
+            '<div style="color:var(--muted);padding:8px">Draw error</div>';
+        }
+      }
+      function cssFilterToCanvasFilter(css) {
+        return css;
+      }
+
+      fileEl.addEventListener("change", (e) => {
+        const f = e.target.files && e.target.files[0];
+        if (!f) {
+          videoFileName.textContent = "No video chosen";
+          return;
+        }
+        const url = URL.createObjectURL(f);
+        video.src = url;
+        video.load();
+        videoFileName.textContent = f.name;
+        setStatus("Video loaded");
+      });
+
+      if (video.requestVideoFrameCallback) {
+        try {
+          video.requestVideoFrameCallback(function cb(now, meta) {
+            if (meta && meta.expectedDisplayInterval) {
+              detectedFps = Math.round(1000 / meta.expectedDisplayInterval);
+              detFpsEl.textContent = detectedFps;
+            }
+            video.requestVideoFrameCallback(cb);
+          });
+        } catch (e) {}
+      }
+      video.addEventListener("timeupdate", () => updateZoomPreview());
+      video.addEventListener("play", () => updateZoomPreview());
+      video.addEventListener("loadedmetadata", () => updateZoomPreview());
+
+      [brightness, contrast, saturate, filterPreset].forEach((el) => {
+        el.addEventListener("input", () => {
+          bVal.textContent = Number(brightness.value).toFixed(2);
+          cVal.textContent = Number(contrast.value).toFixed(2);
+          sVal.textContent = Number(saturate.value).toFixed(2);
+          applyFilterToVideo();
+        });
+      });
+      applyFilterBtn.addEventListener("click", () => applyFilterToVideo());
+      clearFilterBtn.addEventListener("click", () => clearFilters());
+
+      wmImageFile.addEventListener("change", (e) => {
+        const f = e.target.files && e.target.files[0];
+        if (!f) {
+          wmFileName.textContent = "No file chosen";
+          watermarkImg = null;
+          return;
+        }
+        const url = URL.createObjectURL(f);
+        const img = new Image();
+        img.onload = () => {
+          watermarkImg = img;
+          URL.revokeObjectURL(url);
+          wmFileName.textContent = f.name;
+          setStatus("Watermark loaded");
+        };
+        img.src = url;
+      });
+
+      function getCropRectForRatio(ratioValue) {
+        const vw = video.videoWidth,
+          vh = video.videoHeight;
+        if (!vw || !vh) return null;
+        if (ratioValue === "free") return { sx: 0, sy: 0, sw: vw, sh: vh };
+
+        let a, b;
+        const parts = ratioValue.split(":");
+        if (parts.length === 2) {
+          a = parseFloat(parts[0]);
+          b = parseFloat(parts[1]);
+        } else {
+          return { sx: 0, sy: 0, sw: vw, sh: vh }; // Fallback
+        }
+
+        if (isNaN(a) || isNaN(b) || b === 0)
+          return { sx: 0, sy: 0, sw: vw, sh: vh };
+
+        const targetRatio = a / b;
+        let sw = vw,
+          sh = Math.round(sw / targetRatio);
+        if (sh > vh) {
+          sh = vh;
+          sw = Math.round(sh * targetRatio);
+        }
+        const sx = Math.round((vw - sw) / 2);
+        const sy = Math.round((vh - sh) / 2);
+        return { sx, sy, sw, sh };
+      }
+
+      async function blobForCanvasWithTargetMBBinSearch(
+        canvas,
+        mime,
+        targetMB,
+        initialQuality,
+      ) {
+        if (mime === "image/png") {
+          return await new Promise((res) => canvas.toBlob((b) => res(b), mime));
+        }
+        const targetBytes = Math.max(1, Math.round(targetMB * 1024 * 1024));
+        let low = 0.02,
+          high = 1.0,
+          best = null;
+        let q = Math.max(0.02, Math.min(1, initialQuality || 0.92));
+        for (let i = 0; i < 7; i++) {
+          const blob = await new Promise((res) =>
+            canvas.toBlob((b) => res(b), mime, q),
+          );
+          if (!blob) break;
+          const size = blob.size;
+          best = blob;
+          if (size > targetBytes) {
+            high = q;
+            q = (low + q) / 2;
+          } else {
+            low = q;
+            q = (q + high) / 2;
+          }
+        }
+        return best;
+      }
+
+      async function captureOnce() {
+        if (!video || video.readyState < 2) {
+          alert("Video not ready");
+          return null;
+        }
+        setStatus("Capturing...");
+        const vw = video.videoWidth,
+          vh = video.videoHeight;
+        const ratioVal = ratioEl.value;
+        const crop = getCropRectForRatio(ratioVal) || {
+          sx: 0,
+          sy: 0,
+          sw: vw,
+          sh: vh,
+        };
+        let targetW = Number(resizeW.value) || crop.sw;
+        let targetH = Number(resizeH.value) || crop.sh;
+
+        const internalCtx = internalCanvas.getContext("2d");
+        internalCanvas.width = crop.sw;
+        internalCanvas.height = crop.sh;
+        try {
+          internalCtx.drawImage(
+            video,
+            crop.sx,
+            crop.sy,
+            crop.sw,
+            crop.sh,
+            0,
+            0,
+            crop.sw,
+            crop.sh,
+          );
+        } catch (e) {
+          console.error("Capture draw error:", e);
+          setStatus("Capture failed: Draw error");
+          return null;
+        }
+
+        const c = document.createElement("canvas");
+        c.width = targetW;
+        c.height = targetH;
+        const ctx = c.getContext("2d");
+        ctx.filter = cssFilterToCanvasFilter(buildFilterString());
+        ctx.drawImage(
+          internalCanvas,
+          0,
+          0,
+          crop.sw,
+          crop.sh,
+          0,
+          0,
+          targetW,
+          targetH,
+        );
+
+        const wmPos = wmPosition.value;
+        const margin = 8; 
+
+        if (watermarkImg) {
+          const iw = Math.round(targetW * 0.22);
+          const ih = Math.round(
+            (watermarkImg.height / watermarkImg.width) * iw,
+          );
+          let x, y;
+
+          switch (wmPos) {
+            case "top-left":
+              x = margin;
+              y = margin;
+              break;
+            case "top-right":
+              x = targetW - iw - margin;
+              y = margin;
+              break;
+            case "bottom-left":
+              x = margin;
+              y = targetH - ih - margin;
+              break;
+            case "center":
+              x = (targetW - iw) / 2;
+              y = (targetH - ih) / 2;
+              break;
+            case "bottom-right":
+            default:
+              x = targetW - iw - margin;
+              y = targetH - ih - margin;
+          }
+
+          ctx.globalAlpha = 0.9;
+          ctx.drawImage(watermarkImg, x, y, iw, ih);
+          ctx.globalAlpha = 1;
+        }
+
+        const text = wmText.value.trim();
+        if (text) {
+          ctx.font = Math.max(12, Math.round(targetW / 30)) + "px sans-serif";
+          ctx.fillStyle = "rgba(255,255,255,0.9)";
+
+          let tx, ty;
+
+          switch (wmPos) {
+            case "top-left":
+              ctx.textAlign = "left";
+              ctx.textBaseline = "top";
+              tx = margin;
+              ty = margin;
+              break;
+            case "top-right":
+              ctx.textAlign = "right";
+              ctx.textBaseline = "top";
+              tx = targetW - margin;
+              ty = margin;
+              break;
+            case "bottom-left":
+              ctx.textAlign = "left";
+              ctx.textBaseline = "bottom";
+              tx = margin;
+              ty = targetH - margin;
+              break;
+            case "center":
+              ctx.textAlign = "center";
+              ctx.textBaseline = "middle";
+              tx = targetW / 2;
+              ty = targetH / 2;
+              break;
+            case "bottom-right":
+            default:
+              ctx.textAlign = "right";
+              ctx.textBaseline = "bottom";
+              tx = targetW - margin;
+              ty = targetH - margin;
+          }
+
+          ctx.fillText(text, tx, ty);
+
+          ctx.textAlign = "left";
+          ctx.textBaseline = "alphabetic";
+        }
+
+        const mime = formatEl.value || "image/png";
+        const quality = Number(qualityEl.value) || 0.92;
+        const mbTarget = Number(mbTargetEl.value) || 0;
+
+        let blob;
+        if (mbTarget > 0 && (mime === "image/jpeg" || mime === "image/webp")) {
+          blob = await blobForCanvasWithTargetMBBinSearch(
+            c,
+            mime,
+            mbTarget,
+            quality,
+          );
+        } else {
+          blob = await new Promise((res) =>
+            c.toBlob((b) => res(b), mime, quality),
+          );
+        }
+
+        if (!blob) {
+          setStatus("Capture failed");
+          return null;
+        }
+        const ext = mime.split("/")[1].split("+")[0];
+        const name = `capture_${String(captures.length + 1).padStart(3, "0")}.${ext}`;
+        const url = URL.createObjectURL(blob);
+        tempUrls.push(url);
+
+        const item = { name, blob, url, width: c.width, height: c.height };
+        captures.unshift(item); // Add to beginning
+        renderGallery();
+        setStatus("Captured: " + name);
+        updateZoomPreview(); // refresh preview
+        return item;
+      }
+
+      function renderGallery() {
+        thumbList.innerHTML = "";
+        captures.forEach((it, i) => {
+          const d = document.createElement("div");
+          d.className = "thumb";
+          const img = document.createElement("img");
+          img.src = it.url;
+          const meta = document.createElement("div");
+          meta.className = "meta";
+          meta.innerHTML = `<b>${it.name}</b><div class="muted">${it.width || ""}×${it.height || ""} • ${(it.blob.size / 1024) | 0} KB</div>`;
+
+          const actions = document.createElement("div");
+          actions.className = "actions";
+          const view = document.createElement("button");
+          view.className = "btn";
+          view.textContent = "View";
+          view.onclick = () => window.open(it.url, "_blank");
+
+          const dl = document.createElement("button");
+          dl.className = "btn";
+          dl.textContent = "Download";
+          dl.onclick = () => downloadBlob(it.blob, it.name);
+
+          const del = document.createElement("button");
+          del.className = "btn";
+          del.textContent = "Delete";
+          del.onclick = () => {
+            if (confirm("Delete this capture?")) {
+              captures.splice(i, 1);
+              URL.revokeObjectURL(it.url);
+              renderGallery();
+            }
+          };
+
+          const up = document.createElement("button");
+          up.className = "btn";
+          up.textContent = "Upscale";
+          up.onclick = async () => {
+            if (isUpscaling)
+              return alert("Please wait for current upscale job to finish.");
+            isUpscaling = true;
+            setStatus(`Upscaling ${it.name}...`);
+            const factor = Number(upscaleFactorEl.value) || 2;
+            const newItem = await upscaleItemByFactor(it, factor);
+            if (newItem) {
+              captures.unshift(newItem);
+              renderGallery();
+              setStatus(`Upscaled ${it.name} by ${factor}x`);
+            } else {
+              setStatus(`Failed to upscale ${it.name}`);
+            }
+            isUpscaling = false;
+          };
+
+          actions.appendChild(view);
+          actions.appendChild(dl);
+          actions.appendChild(up);
+          actions.appendChild(del);
+
+          d.appendChild(img);
+          d.appendChild(meta);
+          d.appendChild(actions);
+          thumbList.appendChild(d);
+        });
+        galleryCount.textContent = `${captures.length} captures`;
+      }
+
+      function downloadBlob(blob, filename) {
+        const a = document.createElement("a");
+        const url = URL.createObjectURL(blob);
+        tempUrls.push(url);
+        a.href = url;
+        a.download = filename;
+        a.click();
+      }
+
+      downloadAllBtn.addEventListener("click", () => {
+        if (captures.length === 0) return alert("No captures");
+        for (const it of captures) {
+          downloadBlob(it.blob, it.name);
+        }
+      });
+
+      clearAllBtn.addEventListener("click", () => {
+        if (!confirm("Clear all captures?")) return;
+        for (const it of captures) URL.revokeObjectURL(it.url);
+        captures = [];
+        renderGallery();
+      });
+
+      zipBtn.addEventListener("click", async () => {
+        if (captures.length === 0) return alert("No captures");
+        setStatus("Generating ZIP...");
+        try {
+          const mod =
+            await import("https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js");
+          const JSZip = mod.default || window.JSZip;
+          const zip = new JSZip();
+          for (const it of captures) {
+            zip.file(it.name, it.blob);
+          }
+          const content = await zip.generateAsync({ type: "blob" });
+          downloadBlob(content, "captures.zip");
+          setStatus("ZIP ready");
+        } catch (err) {
+          alert("ZIP error: " + err.message);
+          setStatus("ZIP error");
+        }
+      });
+
+      async function upscaleItemByFactor(itemToUpscale, factor) {
+        setStatus(`Upscaling ${itemToUpscale.name} by ${factor}x...`);
+        const img = new Image();
+        const blob = await new Promise((resolve, reject) => {
+          img.onload = async () => {
+            const canvas = document.createElement("canvas");
+            canvas.width = img.naturalWidth * factor;
+            canvas.height = img.naturalHeight * factor;
+            const ctx = canvas.getContext("2d");
+            ctx.imageSmoothingEnabled = false; // nearest-neighbor
+            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+            const mime = formatEl.value || "image/png";
+            const quality = Number(qualityEl.value) || 0.92;
+            canvas.toBlob((b) => resolve(b), mime, quality);
+          };
+          img.onerror = reject;
+          img.src = itemToUpscale.url;
+        });
+
+        if (!blob) return null;
+        const url = URL.createObjectURL(blob);
+        tempUrls.push(url);
+        const cleanName = itemToUpscale.name.replace(
+          /^upscaled_([\dx_]+)?/,
+          "",
+        );
+        const name = `upscaled_${factor}x_${cleanName}`;
+        return {
+          name,
+          blob,
+          url,
+          width: img.naturalWidth * factor,
+          height: img.naturalHeight * factor,
+        };
+      }
+
+      async function upscaleItemToResolution(
+        itemToUpscale,
+        targetWidth,
+        targetHeight,
+        isPortrait,
+      ) {
+        setStatus(
+          `Upscaling ${itemToUpscale.name} to ${isPortrait ? targetHeight + "x" + targetWidth : targetWidth + "x" + targetHeight}...`,
+        );
+        const img = new Image();
+        const blob = await new Promise((resolve, reject) => {
+          img.onload = async () => {
+            const canvas = document.createElement("canvas");
+            canvas.width = isPortrait ? targetHeight : targetWidth;
+            canvas.height = isPortrait ? targetWidth : targetHeight;
+
+            const ctx = canvas.getContext("2d");
+            ctx.imageSmoothingEnabled = false; // nearest-neighbor
+            ctx.drawImage(img, 0, 0, canvas.width, canvas.height); // Draw scaled
+
+            const mime = formatEl.value || "image/png";
+            const quality = Number(qualityEl.value) || 0.92;
+            canvas.toBlob((b) => resolve(b), mime, quality);
+          };
+          img.onerror = reject;
+          img.src = itemToUpscale.url;
+        });
+
+        if (!blob) return null;
+        const url = URL.createObjectURL(blob);
+        tempUrls.push(url);
+        const cleanName = itemToUpscale.name.replace(
+          /^upscaled_([\dx_]+)?/,
+          "",
+        );
+        const resName = `${isPortrait ? targetHeight + "x" + targetWidth : targetWidth + "x" + targetHeight}`;
+        const name = `upscaled_${resName}_${cleanName}`;
+        return {
+          name,
+          blob,
+          url,
+          width: isPortrait ? targetHeight : targetWidth,
+          height: isPortrait ? targetWidth : targetHeight,
+        };
+      }
+
+      upscaleAllOriginalsBtn.addEventListener("click", async () => {
+        if (isUpscaling)
+          return alert("Please wait for current upscale job to finish.");
+
+        const originals = captures.filter(
+          (c) => !c.name.startsWith("upscaled_"),
+        );
+        if (originals.length === 0) {
+          return alert("No original (non-upscaled) captures found to process.");
+        }
+
+        const target = upscaleTargetResolution.value;
+        let targetWidth, targetHeight;
+        switch (target) {
+          case "1080p":
+            [targetWidth, targetHeight] = [1920, 1080];
+            break;
+          case "2k":
+            [targetWidth, targetHeight] = [2560, 1440];
+            break;
+          case "4k":
+            [targetWidth, targetHeight] = [3840, 2160];
+            break;
+          case "8k":
+            [targetWidth, targetHeight] = [7680, 4320];
+            break;
+          default:
+            [targetWidth, targetHeight] = [1920, 1080];
+        }
+
+        isUpscaling = true;
+        upscaleAllOriginalsBtn.disabled = true;
+        setStatus(`Upscaling ${originals.length} images to ${target}...`);
+
+        const newCaptures = [];
+        const total = originals.length;
+
+        for (let i = 0; i < total; i++) {
+          const it = originals[i];
+          const isPortrait = it.width < it.height;
+          setStatus(`Upscaling ${i + 1}/${total}: ${it.name}`);
+          try {
+            const newItem = await upscaleItemToResolution(
+              it,
+              targetWidth,
+              targetHeight,
+              isPortrait,
+            );
+            if (newItem) newCaptures.push(newItem);
+          } catch (e) {
+            console.error("Failed to upscale item:", it.name, e);
+          }
+        }
+
+        captures.unshift(...newCaptures);
+        renderGallery();
+        setStatus(
+          `Upscaling complete. Added ${newCaptures.length} new images.`,
+        );
+        isUpscaling = false;
+        upscaleAllOriginalsBtn.disabled = false;
+      });
+
+      captureBtn.addEventListener("click", captureOnce);
+
+      document
+        .getElementById("burstBtn")
+        .addEventListener("click", async () => {
+          setStatus("Burst capturing 10 frames...");
+          captureBtn.disabled = true;
+          for (let i = 0; i < 10; i++) {
+            await captureOnce();
+            await new Promise((r) => setTimeout(r, 120));
+          }
+          captureBtn.disabled = false;
+          setStatus("Burst done");
+        });
+
+      startAutoBtn.addEventListener("click", () => {
+        const sec = Math.max(0.2, Number(autoIntervalEl.value) || 2);
+        if (autoTimer) clearInterval(autoTimer);
+        autoTimer = setInterval(captureOnce, sec * 1000);
+        startAutoBtn.disabled = true;
+        stopAutoBtn.disabled = false;
+        setStatus(`Auto started (every ${sec}s)`);
+      });
+
+      stopAutoBtn.addEventListener("click", () => {
+        if (autoTimer) clearInterval(autoTimer);
+        autoTimer = null;
+        startAutoBtn.disabled = false;
+        stopAutoBtn.disabled = true;
+        setStatus("Auto stopped");
+      });
+
+      clearTempBtn.addEventListener("click", () => {
+        tempUrls.forEach((u) => {
+          try {
+            URL.revokeObjectURL(u);
+          } catch (e) {}
+        });
+        tempUrls = [];
+        setStatus("Temp URLs cleared");
+      });
+      window.addEventListener("beforeunload", () => {
+        tempUrls.forEach((u) => {
+          try {
+            URL.revokeObjectURL(u);
+          } catch (e) {}
+        });
+        captures.forEach((it) => {
+          try {
+            URL.revokeObjectURL(it.url);
+          } catch (e) {}
+        });
+      });
+      function setStatus(msg) {
+        status.textContent = "Status: " + msg;
+      }
+
+      applyFilterToVideo();
+    </script>
+  </body>
+</html>
